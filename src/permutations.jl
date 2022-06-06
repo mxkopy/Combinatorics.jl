@@ -6,7 +6,8 @@ export
     nthperm!,
     nthperm,
     parity,
-    permutations
+    permutations, 
+    permutations!
 
 
 struct Permutations{T}
@@ -39,10 +40,13 @@ function permutations(a, t::Integer)
     Permutations(a, t)
 end
 
-function Base.iterate(p::Permutations, s = collect(1:length(p.a)))
+
+function Base.iterate(p::Permutations, s::Vector{Int}=collect(1:length(p.a)) )
     (!isempty(s) && max(s[1], p.t) > length(p.a) || (isempty(s) && p.t > 0)) && return
-    nextpermutation(p.a, p.t ,s)
+    nextpermutation(p.a, p.t, s)
 end
+
+
 
 function nextpermutation(m, t, state)
     perm = [m[state[i]] for i in 1:t]
@@ -246,4 +250,93 @@ function parity(p::AbstractVector{<:Integer})
     epsilon = levicivita(p)
     epsilon == 0 && throw(ArgumentError("Not a permutation"))
     epsilon == 1 ? 0 : 1
+end
+
+
+
+
+
+
+
+
+
+
+
+
+function heaps_permutation(m, state)
+    i, c = state
+    while i <= length(m)
+        if c[i] < i
+            if i % 2 == 1
+                m[1], m[i] = m[i], m[1]
+            else 
+                m[c[i]], m[i] = m[i], m[c[i]]
+            end
+            c[i] += 1
+            i     = 1
+            return m, (i, c)
+        else 
+            c[i] = 1
+            i   += 1
+        end
+    end
+end
+
+
+function subset_swap(m, t, i, n)
+    for (k, j) in enumerate( filter( c -> i & (2^c) == 2^c, collect(0:n-1) ) )
+        m[k], m[t + j + 1] = m[t + j + 1], m[k]
+    end
+end
+
+
+function heaps_nextpermutation(m, t, state)
+
+    mv   = view(m, 1:t)
+
+    i, s = state
+    o    = heaps_permutation( mv, s )
+
+    if isnothing( o )
+
+        reverse!( view(m, 1:t) )
+
+        n = length(m) - t 
+
+        while count_ones(i + 1) > t; i += 1; end
+
+        if i >= 2^n; return nothing; end
+
+        subset_swap(m, t, i, n)
+
+        return mv, (i+1, (1, ones(Int, t) ))
+
+    end
+
+    return mv, state
+
+end
+
+
+struct TestPerm{T}
+
+    a::T
+    t::Int
+
+end
+
+permutations!(a, t=length(a)) = TestPerm(a, t)
+
+Base.eltype(::Type{TestPerm{T}}) where {T} = Vector{eltype(T)}
+
+Base.length(p::TestPerm) = (0 <= p.t <= length(p.a)) ? factorial(length(p.a), length(p.a)-p.t) : 0
+
+function Base.iterate( p::TestPerm )
+    return p.a[1:p.t], (1, (1, ones(Int, p.t)) )
+    # return p.a, (1, ones(Int, p.t))
+end
+
+function Base.iterate( p::TestPerm, s::Tuple )
+    return heaps_nextpermutation(p.a, p.t, s)
+    # return heaps_permutation( p.a, s )
 end
